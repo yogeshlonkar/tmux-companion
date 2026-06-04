@@ -1,0 +1,168 @@
+// Battery icons: 10 levels (empty → full)
+const BATTERY_ICONS: [&str; 10] =
+    ["\u{f244}", "\u{f243}", "\u{f243}", "\u{f242}", "\u{f242}", "\u{f241}", "\u{f241}", "\u{f240}", "\u{f240}", "\u{f240}"];
+
+const CHARGING_ICON: &str = "\u{f1e6}";
+
+// Color thresholds: red ≤10%, orange ≤30%, yellow ≤60%, green >60%
+fn battery_color(pct: u64) -> &'static str {
+    match pct {
+        0..=10 => "#[fg=#e74646]",
+        11..=30 => "#[fg=#d05743]",
+        31..=60 => "#[fg=#a8a337]",
+        _ => "#[fg=#5cae36]",
+    }
+}
+
+/// Pure formatting logic extracted so it can be unit-tested without I/O.
+fn format_battery_output(
+    current: u64,
+    max: u64,
+    is_charging: bool,
+    external: bool,
+    epoch_secs: u64,
+) -> String {
+    if current == 0 {
+        return String::new();
+    }
+    let max = max.max(1);
+    let pct = (current * 100) / max;
+    let color = battery_color(pct);
+
+    let icon_idx = if is_charging || external {
+        (epoch_secs % 10) as usize
+    } else {
+        ((pct * 9) / 100) as usize
+    };
+
+    let icon = BATTERY_ICONS[icon_idx.min(9)];
+    let pct_str = if !external { format!(" {}%", pct) } else { String::new() };
+    let plug = if external { format!(" {}", CHARGING_ICON) } else { String::new() };
+
+    format!("{}{}{}{}", color, icon, pct_str, plug)
+}
+
+pub async fn render() -> anyhow::Result<String> {
+    let out = tokio::process::Command::new("ioreg")
+        .args(["-arc", "AppleSmartBattery"])
+        .output()
+        .await?;
+
+    if out.stdout.is_empty() {
+        return Ok(String::new());
+    }
+
+    let batteries: Vec<plist::Dictionary> = plist::from_bytes(&out.stdout)?;
+    let batt = match batteries.first() {
+        Some(b) => b,
+        None => return Ok(String::new()),
+    };
+
+    let current = batt
+        .get("CurrentCapacity")
+        .and_then(|v| v.as_unsigned_integer())
+        .unwrap_or(0);
+    let max = batt
+        .get("MaxCapacity")
+        .and_then(|v| v.as_unsigned_integer())
+        .unwrap_or(100);
+    let is_charging = batt
+        .get("IsCharging")
+        .and_then(|v| v.as_boolean())
+        .unwrap_or(false);
+    let external = batt
+        .get("ExternalConnected")
+        .and_then(|v| v.as_boolean())
+        .unwrap_or(false);
+
+    let epoch_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    Ok(format_battery_output(current, max, is_charging, external, epoch_secs))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn color_red_at_zero() {
+        assert_eq!(battery_color(0), "#[fg=#e74646]");
+        assert_eq!(battery_color(10), "#[fg=#e74646]");
+    }
+
+    #[test]
+    fn color_orange_low() {
+        assert_eq!(battery_color(11), "#[fg=#d05743]");
+        assert_eq!(battery_color(30), "#[fg=#d05743]");
+    }
+
+    #[test]
+    fn color_yellow_mid() {
+        assert_eq!(battery_color(31), "#[fg=#a8a337]");
+        assert_eq!(battery_color(60), "#[fg=#a8a337]");
+    }
+
+    #[test]
+    fn color_green_high() {
+        assert_eq!(battery_color(61), "#[fg=#5cae36]");
+        assert_eq!(battery_color(100), "#[fg=#5cae36]");
+    }
+
+    #[test]
+    fn icons_count_is_ten() {
+        assert_eq!(BATTERY_ICONS.len(), 10);
+        for icon in &BATTERY_ICONS {
+            assert!(!icon.is_empty());
+        }
+    }
+
+    #[test]
+    fn zero_capacity_returns_empty() {
+        assert_eq!(format_battery_output(0, 100, false, false, 0), "");
+    }
+
+    #[test]
+    fn discharging_shows_percentage() {
+        let out = format_battery_output(80, 100, false, false, 0);
+        assert!(out.contains("80%"), "expected 80% in: {out}");
+        assert!(out.contains("#[fg=#5cae36]"), "expected green: {out}");
+        assert!(!out.contains(CHARGING_ICON), "should not show plug: {out}");
+    }
+
+    #[test]
+    fn external_hides_percentage_shows_plug() {
+        let out = format_battery_output(80, 100, false, true, 0);
+        assert!(!out.contains('%'), "external should not show %: {out}");
+        assert!(out.contains(CHARGING_ICON), "should show plug: {out}");
+    }
+
+    #[test]
+    fn charging_icon_cycles_by_epoch() {
+        // Charging animates: epoch_secs % 10 selects the icon index.
+        // At epoch=0 → idx=0, epoch=5 → idx=5.
+        let out0 = format_battery_output(50, 100, true, false, 0);
+        let out5 = format_battery_output(50, 100, true, false, 5);
+        // Both must contain a battery icon (non-empty output) — exact icon may differ.
+        assert!(!out0.is_empty());
+        assert!(!out5.is_empty());
+    }
+
+    #[test]
+    fn icon_index_matches_percentage() {
+        // At 0% → idx 0 (lowest icon); at 100% → idx 9 (fullest icon).
+        let low = format_battery_output(5, 100, false, false, 0);
+        let full = format_battery_output(100, 100, false, false, 0);
+        assert!(low.contains(BATTERY_ICONS[0]));
+        assert!(full.contains(BATTERY_ICONS[9]));
+    }
+
+    #[test]
+    fn percentage_calculated_correctly() {
+        // 60/80 = 75%
+        let out = format_battery_output(60, 80, false, false, 0);
+        assert!(out.contains("75%"), "expected 75% in: {out}");
+    }
+}

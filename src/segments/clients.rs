@@ -28,14 +28,17 @@ fn format_client_output(srv_clients: u32, session_attached: u32, window_active_c
 }
 
 pub async fn render(session_attached: u32, window_active_clients: u32) -> anyhow::Result<String> {
-    let out = tokio::process::Command::new("tmux")
-        .args(["-S", "/tmp/tmux-sock", "list-clients"])
-        .output()
-        .await;
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::process::Command::new("tmux")
+            .args(["-S", "/tmp/tmux-sock", "list-clients"])
+            .output(),
+    )
+    .await;
 
-    let raw_count = match out {
-        Ok(o) => String::from_utf8_lossy(&o.stdout).lines().count() as u32,
-        Err(_) => return Ok(String::new()),
+    let raw_count = match result {
+        Ok(Ok(o)) => String::from_utf8_lossy(&o.stdout).lines().count() as u32,
+        _ => return Ok(String::new()),
     };
 
     if raw_count <= 1 {

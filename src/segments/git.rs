@@ -379,11 +379,15 @@ pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> S
 }
 
 async fn run_git(args: &[&str], dir: &Path) -> anyhow::Result<String> {
-    let out = tokio::process::Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .await?;
+    let out = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::process::Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output(),
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("git {:?} timed out", args))??;
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
@@ -487,8 +491,8 @@ mod tests {
     use super::*;
     use crate::tmux::{
         format::{
-            BG_CLEAN, BG_DEFAULT, BG_ERROR, BG_GONE, BG_LOADING, BG_NEW, BG_TERMINAL, FG_BLUE,
-            FG_CLEAN, FG_DARK_BLUE, FG_DEFAULT, FG_GONE, FG_GREEN, FG_GREY89, FG_PREVIOUS,
+            BG_CLEAN, BG_DEFAULT, BG_ERROR, BG_GONE, BG_LOADING, BG_NEW, BG_TERMINAL,
+            FG_CLEAN, FG_DARK_BLUE, FG_DEFAULT, FG_GONE, FG_GREEN, FG_PREVIOUS,
             FG_PURPLE, colored_segment, powerline_segment,
         },
         icons::*,

@@ -7,6 +7,8 @@ use std::{
 pub struct ServerState {
     pub net_previous: Option<(u64, u64, Instant)>,
     pub dir_aliases: HashMap<PathBuf, String>,
+    /// Cached battery render result with the time it was computed.
+    pub battery_cache: Option<(String, Instant)>,
 }
 
 impl ServerState {
@@ -14,6 +16,7 @@ impl ServerState {
         Self {
             net_previous: None,
             dir_aliases: load_dir_aliases(),
+            battery_cache: None,
         }
     }
 }

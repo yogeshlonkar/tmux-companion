@@ -70,7 +70,8 @@ bench_parallel() {
 echo "Starting server..."
 pkill -f "tmux-companion server" 2>/dev/null || true
 sleep 0.1
-"$BINARY" gst "$REPO" > /dev/null   # auto-starts server + warms cache
+"$BINARY" gst "$REPO" > /dev/null   # auto-starts server + warms gst cache
+"$BINARY" battery > /dev/null       # warms battery cache (first IOKit call is slow)
 sleep 0.1
 echo "Server ready."
 echo ""

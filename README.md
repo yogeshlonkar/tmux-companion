@@ -1,5 +1,7 @@
 # tmux-companion
 
+![screenshot-tmux-status-bar.png](./screenshot-tmux-status-bar.png)
+
 A single self-contained Rust binary that replaces a collection of shell scripts
 and a Go tool (`yrl gst`) used to drive tmux status-line segments.
 

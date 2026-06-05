@@ -7,9 +7,6 @@ edition = "2024"
 name = "tmux-companion"
 path = "src/main.rs"
 
-[install]
-root = "/usr/local/bin"
-
 [dependencies]
 clap        = { version = "4.5",  features = ["derive"] }
 tokio       = { version = "1.40", features = ["full"] }
@@ -20,7 +17,8 @@ base64      = "0.22"
 nix         = { version = "0.29", features = ["process", "signal", "user"] }
 anyhow      = "1.0"
 regex       = "1.11"
-plist       = "1.7"
+sysinfo     = "0.39"
+battery     = "0.7"
 
 [dev-dependencies]
 tempfile = "3.12"

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use tokio::sync::Mutex;
 
@@ -16,7 +16,27 @@ pub async fn dispatch(req: Request, state: Arc<Mutex<ServerState>>) -> Response 
             let force = req.args["force"].as_bool().unwrap_or(false);
             segments::git::render(path, pid, force).await
         }
-        "battery" => segments::battery::render().await,
+        "battery" => {
+            const TTL: Duration = Duration::from_secs(30);
+            async {
+                let cached = {
+                    let st = state.lock().await;
+                    st.battery_cache
+                        .as_ref()
+                        .filter(|(_, t)| t.elapsed() < TTL)
+                        .map(|(s, _)| s.clone())
+                };
+                if let Some(s) = cached {
+                    Ok(s)
+                } else {
+                    let s = segments::battery::render().await?;
+                    state.lock().await.battery_cache =
+                        Some((s.clone(), std::time::Instant::now()));
+                    Ok(s)
+                }
+            }
+            .await
+        }
         "net" => {
             let mut st = state.lock().await;
             segments::network::render(&mut st.net_previous).await

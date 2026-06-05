@@ -43,44 +43,28 @@ fn format_battery_output(
 }
 
 pub async fn render() -> anyhow::Result<String> {
-    let out = tokio::process::Command::new("ioreg")
-        .args(["-arc", "AppleSmartBattery"])
-        .output()
-        .await?;
+    tokio::task::spawn_blocking(|| {
+        use battery::units::ratio::ratio;
 
-    if out.stdout.is_empty() {
-        return Ok(String::new());
-    }
+        let manager = battery::Manager::new()?;
+        let b = match manager.batteries()?.next() {
+            Some(Ok(b)) => b,
+            _ => return Ok(String::new()),
+        };
 
-    let batteries: Vec<plist::Dictionary> = plist::from_bytes(&out.stdout)?;
-    let batt = match batteries.first() {
-        Some(b) => b,
-        None => return Ok(String::new()),
-    };
+        let soc: f32 = b.state_of_charge().get::<ratio>(); // 0.0..=1.0
+        let current = (soc * 100.0) as u64;
+        let is_charging = b.state() == battery::State::Charging;
+        let external = matches!(b.state(), battery::State::Charging | battery::State::Full);
 
-    let current = batt
-        .get("CurrentCapacity")
-        .and_then(|v| v.as_unsigned_integer())
-        .unwrap_or(0);
-    let max = batt
-        .get("MaxCapacity")
-        .and_then(|v| v.as_unsigned_integer())
-        .unwrap_or(100);
-    let is_charging = batt
-        .get("IsCharging")
-        .and_then(|v| v.as_boolean())
-        .unwrap_or(false);
-    let external = batt
-        .get("ExternalConnected")
-        .and_then(|v| v.as_boolean())
-        .unwrap_or(false);
+        let epoch_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
 
-    let epoch_secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    Ok(format_battery_output(current, max, is_charging, external, epoch_secs))
+        Ok(format_battery_output(current, 100, is_charging, external, epoch_secs))
+    })
+    .await?
 }
 
 #[cfg(test)]

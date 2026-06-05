@@ -27,62 +27,39 @@ fn iec_fmt_styled(bytes_per_sec: u64) -> String {
     format!("{}#[fg=colour237,none,italics]{}#[none]", num, unit)
 }
 
-/// Parse `netstat -ibn` output and return (total_rx_bytes, total_tx_bytes).
-/// Exposed for unit testing.
-fn parse_netstat_output(text: &str) -> (u64, u64) {
-    let mut total_rx: u64 = 0;
-    let mut total_tx: u64 = 0;
-
-    // netstat -ibn columns on macOS:
-    // Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
-    for line in text.lines().skip(1) {
-        let cols: Vec<&str> = line.split_whitespace().collect();
-        if cols.len() < 10 {
-            continue;
-        }
-        let name = cols[0];
-        if name.starts_with("lo") {
-            continue;
-        }
-        // Ibytes = col 6, Obytes = col 9
-        if let (Ok(rx), Ok(tx)) = (cols[6].parse::<u64>(), cols[9].parse::<u64>()) {
-            total_rx = total_rx.saturating_add(rx);
-            total_tx = total_tx.saturating_add(tx);
-        }
-    }
-
-    (total_rx, total_tx)
-}
-
 /// Format bandwidth delta into tmux status segment(s).
 /// Returns empty string when both are below threshold.
 fn format_bandwidth(dl: u64, ul: u64) -> String {
     let mut out = String::new();
     if dl >= THRESHOLD_BPS {
         out.push_str(&format!(
-            "#[fg=#5cae36]{}#[fg=colour233,bg=#5cae36]{} ",
+            "#[fg=#5cae36]{}#[fg=colour233,bg=#5cae36]{}",
             ARROW_LEFT, iec_fmt_styled(dl)
         ));
     }
     if ul >= THRESHOLD_BPS {
         out.push_str(&format!(
-            "#[fg=#0262a8]{}#[fg=colour233,bg=#0262a8]{} ",
+            "#[fg=#0262a8]{}#[fg=colour233,bg=#0262a8]{}",
             ARROW_LEFT, iec_fmt_styled(ul)
         ));
     }
     out
 }
 
-async fn read_net_bytes() -> anyhow::Result<(u64, u64)> {
-    let out = tokio::process::Command::new("netstat")
-        .args(["-ibn"])
-        .output()
-        .await?;
-    Ok(parse_netstat_output(&String::from_utf8_lossy(&out.stdout)))
+/// Read cumulative rx/tx bytes from all non-loopback interfaces via sysinfo.
+/// Replaces the `netstat -ibn` subprocess; eliminates the periodic netstat stall.
+fn read_net_bytes_native() -> (u64, u64) {
+    let networks = sysinfo::Networks::new_with_refreshed_list();
+    networks
+        .iter()
+        .filter(|(name, _)| !name.starts_with("lo"))
+        .fold((0u64, 0u64), |(rx, tx), (_, data)| {
+            (rx + data.total_received(), tx + data.total_transmitted())
+        })
 }
 
 pub async fn render(previous: &mut Option<(u64, u64, Instant)>) -> anyhow::Result<String> {
-    let (rx, tx) = read_net_bytes().await?;
+    let (rx, tx) = tokio::task::spawn_blocking(read_net_bytes_native).await?;
 
     let Some((prev_rx, prev_tx, prev_time)) = previous.take() else {
         *previous = Some((rx, tx, Instant::now()));
@@ -141,44 +118,6 @@ mod tests {
         assert_eq!(iec_fmt(1024, 0), "1KiB/s");
         // 1023 B/s stays in B
         assert_eq!(iec_fmt(1023, 0), "1023B/s");
-    }
-
-    // ── parse_netstat_output ─────────────────────────────────────────────────
-
-    const NETSTAT_SAMPLE: &str = "\
-Name  Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll
-en0   1500  <Link#4>      aa:bb:cc:dd:ee:ff  12000     0   10240000    8000     0    5120000     0
-en0   1500  192.168.1.0/24 192.168.1.10      12000     0   10240000    8000     0    5120000     0
-lo0   16384 <Link#1>      localhost           5000     0    1000000    5000     0    1000000     0
-utun0 1500  <Link#10>     -                   2000     0     512000    1500     0     256000     0
-";
-
-    #[test]
-    fn parse_sums_non_loopback_interfaces() {
-        let (rx, tx) = parse_netstat_output(NETSTAT_SAMPLE);
-        // en0 appears twice (link + IP rows), both counted: 2×10240000 = 20480000
-        // utun0: +512000 rx, +256000 tx
-        // lo0 is excluded
-        assert_eq!(rx, 2 * 10_240_000 + 512_000);
-        assert_eq!(tx, 2 * 5_120_000 + 256_000);
-    }
-
-    #[test]
-    fn parse_skips_loopback() {
-        let input = "\
-Name  Mtu   Network   Address   Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
-lo0   16384 <Link#1>  localhost  1000     0 999999  1000     0 999999    0
-";
-        let (rx, tx) = parse_netstat_output(input);
-        assert_eq!(rx, 0);
-        assert_eq!(tx, 0);
-    }
-
-    #[test]
-    fn parse_skips_short_lines() {
-        let input = "Name Mtu\nen0\n"; // too few columns
-        let (rx, tx) = parse_netstat_output(input);
-        assert_eq!((rx, tx), (0, 0));
     }
 
     // ── format_bandwidth ─────────────────────────────────────────────────────
@@ -288,12 +227,8 @@ lo0   16384 <Link#1>  localhost  1000     0 999999  1000     0 999999    0
 
     #[tokio::test]
     async fn render_no_previous_returns_empty_and_stores_state() {
-        // We can't call real render() without netstat, but we can test the
-        // state machine inline.
-        let mut previous: Option<(u64, u64, Instant)> = None;
-
         // Simulate first call: set previous
-        previous = Some((1000, 2000, Instant::now()));
+        let mut previous: Option<(u64, u64, Instant)> = Some((1000, 2000, Instant::now()));
         assert!(previous.is_some());
 
         // Simulate second call: compute delta

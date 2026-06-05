@@ -1,33 +1,19 @@
 const VIM_OUTPUT: &str =
-    "#[fg=#0262a8,bg=colour235,none] n#[fg=#539035]im#[fg=colour235,bg=colour233]";
-
-/// Returns true if a single `ps -o stat=,comm=` output line represents a
-/// stopped (state=T) nvim process.
-fn is_suspended_nvim(ps_line: &str) -> bool {
-    ps_line.starts_with('T') && ps_line.contains("nvim")
-}
+    "#[fg=#0262a8,bg=colour235,none] n#[fg=#539035]󰕷im#[fg=colour235,bg=colour233]";
 
 pub async fn has_suspended_nvim(pane_pid: u32) -> anyhow::Result<bool> {
-    let child_out = tokio::process::Command::new("pgrep")
-        .args(["-P", &pane_pid.to_string()])
-        .output()
-        .await?;
-
-    let child_pids: Vec<u32> = String::from_utf8_lossy(&child_out.stdout)
-        .lines()
-        .filter_map(|l| l.trim().parse().ok())
-        .collect();
-
-    for pid in child_pids {
-        let ps_out = tokio::process::Command::new("ps")
-            .args(["-p", &pid.to_string(), "-o", "stat=,comm="])
-            .output()
-            .await?;
-        if is_suspended_nvim(&String::from_utf8_lossy(&ps_out.stdout)) {
-            return Ok(true)
-        }
-    }
-    return Ok(false)
+    Ok(tokio::task::spawn_blocking(move || {
+        use sysinfo::{Pid, ProcessesToUpdate, System};
+        let mut sys = System::new();
+        sys.refresh_processes(ProcessesToUpdate::All, true);
+        let parent = Pid::from_u32(pane_pid);
+        sys.processes().values().any(|p| {
+            p.parent() == Some(parent)
+                && p.status() == sysinfo::ProcessStatus::Stop
+                && p.name().to_string_lossy().contains("nvim")
+        })
+    })
+    .await?)
 }
 
 pub async fn render(pane_pid: u32) -> anyhow::Result<String> {
@@ -41,37 +27,15 @@ pub async fn render(pane_pid: u32) -> anyhow::Result<String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn detects_stopped_nvim() {
-        assert!(is_suspended_nvim("T  nvim"));
-        assert!(is_suspended_nvim("T+ nvim\n"));
-        assert!(is_suspended_nvim("T  nvim --noplugin"));
-    }
-
-    #[test]
-    fn ignores_running_nvim() {
-        assert!(!is_suspended_nvim("S  nvim")); // sleeping, not stopped
-        assert!(!is_suspended_nvim("R  nvim")); // running
-    }
-
-    #[test]
-    fn ignores_stopped_non_nvim() {
-        assert!(!is_suspended_nvim("T  zsh"));
-        assert!(!is_suspended_nvim("T  vim")); // vim ≠ nvim
-        assert!(!is_suspended_nvim("T  node"));
-    }
-
-    #[test]
-    fn empty_line_is_not_match() {
-        assert!(!is_suspended_nvim(""));
-        assert!(!is_suspended_nvim("   "));
-    }
+    // is_suspended_nvim() no longer exists — detection is done in-process via sysinfo.
+    // Integration coverage: run `vim-bg <pane_pid>` with/without a suspended nvim child.
 
     #[test]
     fn output_constant_contains_color_codes() {
         assert!(VIM_OUTPUT.contains("fg=#0262a8"));
         assert!(VIM_OUTPUT.contains("fg=#539035"));
         assert!(VIM_OUTPUT.contains("n"));
+        assert!(VIM_OUTPUT.contains("󰕷"));
         assert!(VIM_OUTPUT.contains("im"));
     }
 }

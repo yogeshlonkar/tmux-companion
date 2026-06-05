@@ -21,7 +21,7 @@ exit.
 │  #(tmux-companion gst …)  #(tmux-companion battery)  │
 │         │                        │                   │
 └─────────┼────────────────────────┼───────────────────┘
-          │  Unix socket            │
+          │  Unix socket           │
           ▼                        ▼
 ┌─────────────────────────────────────────────────────┐
 │  tmux-companion server                              │

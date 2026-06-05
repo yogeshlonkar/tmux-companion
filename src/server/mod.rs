@@ -33,6 +33,18 @@ pub async fn run() -> anyhow::Result<()> {
 
     let state = Arc::new(Mutex::new(ServerState::new()));
 
+    // Pre-warm battery cache so the first tmux refresh doesn't hit the ~600ms
+    // cold-start cost of IOKit initialization in the battery crate.
+    {
+        let state = Arc::clone(&state);
+        tokio::spawn(async move {
+            if let Ok(s) = crate::segments::battery::render().await {
+                state.lock().await.battery_cache =
+                    Some((s, std::time::Instant::now()));
+            }
+        });
+    }
+
     loop {
         let (stream, _) = listener.accept().await?;
         let state = Arc::clone(&state);

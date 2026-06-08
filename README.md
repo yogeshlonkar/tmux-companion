@@ -10,6 +10,8 @@ as a persistent background daemon.  Each tmux refresh sends a lightweight JSON
 request over a Unix socket and prints the result — no process startup overhead,
 no re-reading config files, no repeated disk I/O.
 
+**Requires font with nerdfonts glyphs**
+
 ## Segments
 
 | Subcommand | Replaces | What it shows |

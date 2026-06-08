@@ -2,7 +2,7 @@
 const BATTERY_ICONS: [&str; 10] =
     ["\u{f244}", "\u{f243}", "\u{f243}", "\u{f242}", "\u{f242}", "\u{f241}", "\u{f241}", "\u{f240}", "\u{f240}", "\u{f240}"];
 
-const CHARGING_ICON: &str = "\u{f1e6}";
+pub const CHARGING_ICON: &str = "\u{f1e6}";
 
 // Color thresholds: red ≤10%, orange ≤30%, yellow ≤60%, green >60%
 fn battery_color(pct: u64) -> &'static str {

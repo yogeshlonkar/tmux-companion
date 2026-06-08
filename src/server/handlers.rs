@@ -30,8 +30,11 @@ pub async fn dispatch(req: Request, state: Arc<Mutex<ServerState>>) -> Response 
                     Ok(s)
                 } else {
                     let s = segments::battery::render().await?;
-                    state.lock().await.battery_cache =
-                        Some((s.clone(), std::time::Instant::now()));
+                    // Don't cache while charging — the percentage changes every second.
+                    if !s.contains(segments::battery::CHARGING_ICON) {
+                        state.lock().await.battery_cache =
+                            Some((s.clone(), std::time::Instant::now()));
+                    }
                     Ok(s)
                 }
             }

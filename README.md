@@ -1,6 +1,22 @@
 # tmux-companion
 
+*Status bar*
+
 ![screenshot-tmux-status-bar.png](./screenshot-tmux-status-bar.png)
+
+*Left*
+
+![screenshot-tmux-status-bar-left.png](./screenshot-tmux-status-bar-left.png)
+
+*Middle*
+
+![screenshot-tmux-status-bar-middle.png](./screenshot-tmux-status-bar-middle.png)
+
+*Right*
+
+![screenshot-tmux-status-bar-right.png](./screenshot-tmux-status-bar-right.png)
+
+---
 
 A single self-contained Rust binary that replaces a collection of shell scripts
 and a Go tool (`yrl gst`) used to drive tmux status-line segments.
@@ -28,7 +44,8 @@ All subcommands speak to the same daemon; only `server` starts the daemon itself
 ## Quick start
 
 ```sh
-cargo install --path .          # installs to ~/.cargo/bin/tmux-companion
+cargo build --release
+sudo mv target/release/tmux-companion <some-dirctory-in-your-PATH>
 
 # Manual smoke test
 tmux-companion server &         # auto-started by clients, but you can start it explicitly
@@ -50,8 +67,8 @@ set -g  status-right "#[fg=colour235,bg=colour233]#[fg=colour240,bg=colour235] %
 set -ga status-right " #(tmux-companion net)#[fg=color237]#[bg=colour237]#(tmux-companion battery) "
 
 set -g  window-status-current-format \
-  "#(tmux-companion window -c -i #I -n '#W' -w #{pane_current_path} \
-     -p #{pane_current_command} -s #{pane_start_path} -I #{window_id} -f '#{window_flags}')"
+  "#(tmux-companion window -c -i #I -n '#W' -w '#{pane_current_path}' \
+     -p '#{pane_current_command}' -s '#{pane_start_path}' -I #{window_id} -f '#{window_flags}')"
 set -g  window-status-format \
   "#(tmux-companion window -i #I -n '#W' -w '#{pane_current_path}' \
      -p '#{pane_current_command}' -I #{window_id} -f '#{window_flags}')"

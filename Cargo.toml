@@ -19,6 +19,8 @@ anyhow      = "1.0"
 regex       = "1.11"
 sysinfo     = "0.39"
 battery     = "0.7"
+tokio-tungstenite = "0.30.0"
+futures-util = "0.3.33"
 
 [dev-dependencies]
 tempfile = "3.12"

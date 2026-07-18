@@ -4,7 +4,9 @@ mod proto;
 mod segments;
 mod server;
 mod tmux;
+mod tts;
 
+use std::io::Read;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -70,6 +72,15 @@ enum Cmd {
         flags: String,
         #[arg(short = 'l', default_value = "0")]
         last: u32,
+    },
+
+    /// Speak text through a local vachan-server TTS (arg, or stdin if omitted)
+    Speak {
+        #[arg(trailing_var_arg = true)]
+        text: Vec<String>,
+        /// vachan-server WebSocket URL (default: ws://127.0.0.1:8765/synthesize)
+        #[arg(long)]
+        url: Option<String>,
     },
 }
 
@@ -151,6 +162,16 @@ async fn main() -> anyhow::Result<()> {
                 }),
             })
             .await?;
+        }
+        Cmd::Speak { text, url } => {
+            let text = if text.is_empty() {
+                let mut buf = String::new();
+                std::io::stdin().read_to_string(&mut buf)?;
+                buf
+            } else {
+                text.join(" ")
+            };
+            tts::speak(url.as_deref(), &text).await?;
         }
     }
 

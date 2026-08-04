@@ -4,6 +4,11 @@ pub const AHEAD: &str = "\u{f40a} ";
 pub const ARROW_RIGHT: &str = "\u{e0bc}";
 // Lower-right triangle separator; used only by the net segment.
 pub const ARROW_LEFT: &str = "\u{e0ba}";
+// Slanted caps for the current-window block in the window segment.
+// Same slant family as ARROW_LEFT so the left and right halves of the status
+// bar share one shape language.
+pub const SLANT_IN: &str = "\u{e0ba}";
+pub const SLANT_OUT: &str = "\u{e0bc}";
 pub const BEHIND: &str = "\u{f409} ";
 pub const BUGFIX: &str = "\u{f188} ";
 pub const CHORE: &str = "\u{f19a1} ";

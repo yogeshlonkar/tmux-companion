@@ -72,6 +72,12 @@ enum Cmd {
         flags: String,
         #[arg(short = 'l', default_value = "0")]
         last: u32,
+        /// Number of panes in the window (#{window_panes})
+        #[arg(short = 'P', default_value = "1")]
+        pane_count: u32,
+        /// Index of the window's active pane (#{pane_index})
+        #[arg(short = 'A', default_value = "0")]
+        pane_index: u32,
     },
 
     /// Speak text through a local vachan-server TTS (arg, or stdin if omitted)
@@ -144,6 +150,8 @@ async fn main() -> anyhow::Result<()> {
             start_path,
             flags,
             last,
+            pane_count,
+            pane_index,
         } => {
             let name_opt = if name.is_empty() { None } else { Some(name) };
             let proc_opt = if process.is_empty() { None } else { Some(process) };
@@ -159,6 +167,8 @@ async fn main() -> anyhow::Result<()> {
                     "start_path": start_path.as_ref().map(|p| p.to_string_lossy().into_owned()),
                     "flags": flags,
                     "last": last,
+                    "pane_count": pane_count,
+                    "pane_index": pane_index,
                 }),
             })
             .await?;

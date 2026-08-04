@@ -68,11 +68,16 @@ set -ga status-right " #(tmux-companion net)#[fg=color237]#[bg=colour237]#(tmux-
 
 set -g  window-status-current-format \
   "#(tmux-companion window -c -i #I -n '#W' -w '#{pane_current_path}' \
-     -p '#{pane_current_command}' -s '#{pane_start_path}' -I #{window_id} -f '#{window_flags}')"
+     -p '#{pane_current_command}' -s '#{pane_start_path}' -I #{window_id} -f '#{window_flags}' \
+     -P #{window_panes} -A #{pane_index})"
 set -g  window-status-format \
   "#(tmux-companion window -i #I -n '#W' -w '#{pane_current_path}' \
-     -p '#{pane_current_command}' -I #{window_id} -f '#{window_flags}')"
+     -p '#{pane_current_command}' -I #{window_id} -f '#{window_flags}' \
+     -P #{window_panes} -A #{pane_index})"
 ```
+
+`-P` / `-A` add a numeric-circle suffix with the active pane index, shown only
+when the window holds more than one pane.
 
 ## The `gst` segment in detail
 

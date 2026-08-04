@@ -1,0 +1,19 @@
+src/tmux/icons.rs
+  s_b9a954f56f9448::t_9a0a279f0f8402 5-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "64acd0d229b6eb7bba0e9ec434ffdf7eb1e77a2a",
+  "prompts": {},
+  "sessions": {
+    "s_b9a954f56f9448": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5ba2afb7-9525-4019-80a4-dd72c3d5ff4d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yogesh <yogesh@lonkar.org>"
+    }
+  }
+}

@@ -207,8 +207,14 @@ pub fn render(args: &WindowArgs, dir_aliases: &HashMap<PathBuf, String>) -> Stri
         String::new()
     };
 
-    // Pane suffix: only shown for split windows
-    let pane_suffix = pane_suffix(args.pane_count, args.pane_index);
+    // Pane suffix: only for the current window, and only when it is split.
+    // The active pane index is meaningless for windows you are not looking at,
+    // and dropping it keeps the inactive run of windows narrow.
+    let pane_suffix = if args.current {
+        pane_suffix(args.pane_count, args.pane_index)
+    } else {
+        String::new()
+    };
 
     let (cap_in, cap_out) = block_caps(args.current);
 
@@ -755,6 +761,7 @@ mod tests {
     #[test]
     fn render_split_window_appends_pane_icon() {
         let args = WindowArgs {
+            current: true,
             index: 1,
             pane_count: 3,
             pane_index: 2,
@@ -762,14 +769,31 @@ mod tests {
         };
         let out = render(&args, &no_aliases());
         assert!(
-            out.ends_with(PANE_BOX[2]),
-            "expected pane 2 box icon last: {out}"
+            visible(&out).contains(PANE_BOX[2]),
+            "expected pane 2 box icon: {out}"
         );
+    }
+
+    #[test]
+    fn render_split_non_current_window_has_no_pane_icon() {
+        // The active pane index only matters for the window you are looking at.
+        let args = WindowArgs {
+            current: false,
+            index: 1,
+            pane_count: 3,
+            pane_index: 2,
+            ..args_base()
+        };
+        let out = render(&args, &no_aliases());
+        for icon in PANE_BOX.iter() {
+            assert!(!out.contains(icon), "no pane icon expected: {out}");
+        }
     }
 
     #[test]
     fn render_pane_suffix_precedes_alert() {
         let args = WindowArgs {
+            current: true,
             index: 1,
             pane_count: 2,
             pane_index: 2,

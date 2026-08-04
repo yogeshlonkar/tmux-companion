@@ -9,6 +9,17 @@ pub const ARROW_LEFT: &str = "\u{e0ba}";
 // bar share one shape language.
 pub const SLANT_IN: &str = "\u{e0ba}";
 pub const SLANT_OUT: &str = "\u{e0bc}";
+// Bandwidth-rate units for the net segment.  Each one stands in for the whole
+// unit ("KiB/s", "MiB/s", "GiB/s") to keep the segment narrow.  The commented
+// alternatives are the md-alpha_k / md-alpha_m / md-alpha_g Nerd Font glyphs.
+// Tests reference these by name, so swapping them needs no test edits — only
+// that they stay distinct and never begin with a digit.
+// pub const RATE_KIB: &str = "\u{f0af8}";
+pub const RATE_KIB: &str = "K";
+// pub const RATE_MIB: &str = "\u{f0afa}";
+pub const RATE_MIB: &str = "M";
+// pub const RATE_GIB: &str = "\u{f0af4}";
+pub const RATE_GIB: &str = "G";
 pub const BEHIND: &str = "\u{f409} ";
 pub const BUGFIX: &str = "\u{f188} ";
 pub const CHORE: &str = "\u{f19a1} ";

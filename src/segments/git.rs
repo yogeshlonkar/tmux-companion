@@ -15,14 +15,16 @@ use crate::tmux::{
         Segment, Style, colored_segment, powerline_segment,
     },
     icons::{
-        ADDED, AHEAD, ARROW_RIGHT, BEHIND, CLEAN, COPIED, DELETED, DIVIDER, FAILED, GIT, MODIFIED,
-        NEW, RENAMED, SEPARATOR, STAGED, STASHED, SYNC, UNMERGED, WHITE_SPACE,
+        ADDED, AHEAD, ARROW_RIGHT, BEHIND, CLEAN, COPIED, DELETED, FAILED, GIT, MODIFIED, NEW,
+        RENAMED, STAGED, STASHED, SYNC, UNMERGED, WHITE_SPACE,
     },
 };
 
-/// End cap for the outline styles.  Swap for any of the `CAP_*` icons —
-/// `tmux-companion preview` renders them all side by side.
-const OUTLINE_CAP: &str = crate::tmux::icons::CAP_NONE;
+/// End cap for the outline styles.  The fill style ends with a solid arrow
+/// against the bar; outline has no fill to bound, so it ends with SEPARATOR to
+/// keep clear of the next segment.  Swap for any `CAP_*` icon —
+/// `tmux-companion preview` renders the alternatives side by side.
+const OUTLINE_CAP: &str = crate::tmux::icons::SEPARATOR;
 
 const BRANCH_MAX_LEN: usize = 20;
 const HEAD_LEN: usize = 8;
@@ -366,7 +368,7 @@ pub fn status_line_capped(
         colored_segment(no_tmux, fg, bg, ""),
         GIT,
         short_branch(&s.branch),
-        SEPARATOR
+        WHITE_SPACE
     ));
 
     if s.is_new {
@@ -454,7 +456,7 @@ pub fn status_line_capped(
         ),
     );
 
-    status_line.add(sub.join(DIVIDER));
+    status_line.add(sub.join(WHITE_SPACE));
 
     if no_tmux {
         status_line.append(&format!(
@@ -636,7 +638,7 @@ mod tests {
             colored_segment(no_tmux, fg, bg, ""),
             GIT,
             short_branch(branch),
-            SEPARATOR
+            WHITE_SPACE
         )
     }
     fn arrow(bg: &str, no_tmux: bool) -> String {
@@ -1199,8 +1201,10 @@ mod tests {
         assert!(line.contains(ADDED));
         assert!(line.contains(STAGED));
         assert!(line.contains(STASHED));
-        // Dividers between sub-sections
-        assert!(line.contains(DIVIDER));
+        // Sub-sections are separated by plain spaces, and only the segment end
+        // carries a glyph.
+        assert!(!line.contains('|'), "stale pipe divider: {line}");
+        assert_eq!(line.matches(SEPARATOR).count(), 0, "fill ends with an arrow: {line}");
         // untracked(1) + unstaged.added(1) → count 2
         assert!(line.contains(&format!("2{}", ADDED)));
     }
@@ -1383,20 +1387,20 @@ mod tests {
     }
 
     #[test]
-    fn outline_ends_without_a_cap_glyph() {
+    fn outline_ends_with_the_separator_glyph() {
         let s = s_clean();
         let line = status_line_styled(&s, false, false, Style::Outline);
-        assert!(line.ends_with(&powerline_segment(BG_CLEAN, BG_BAR, OUTLINE_CAP)));
+        assert!(line.ends_with(&powerline_segment(BG_CLEAN, BG_BAR, SEPARATOR)));
         // The solid triangle must not survive into an outline render.
         assert!(!line.contains(ARROW_RIGHT), "solid arrow left over: {line}");
     }
 
     #[test]
-    fn outline_last_visible_char_is_not_a_glyph() {
-        // With CAP_NONE the render must end on the color marker, so the segment
-        // simply stops rather than drawing a floating shape.
+    fn separator_appears_once_and_only_at_the_end() {
         let line = status_line_styled(&s_dirty_all(), false, false, Style::OutlineBright);
-        assert!(line.ends_with(']'), "trailing glyph after the cap: {line}");
+        assert_eq!(line.matches(SEPARATOR).count(), 1, "{line}");
+        assert!(line.ends_with(SEPARATOR), "{line}");
+        assert!(!line.contains('|'), "stale pipe divider: {line}");
     }
 
     #[test]

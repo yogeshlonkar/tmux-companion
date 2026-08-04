@@ -34,7 +34,6 @@ pub const CHORE: &str = "\u{f19a1} ";
 pub const CLEAN: &str = "\u{ebb1}";
 pub const COPIED: &str = "\u{f0191} ";
 pub const DELETED: &str = "\u{f0ad3} ";
-pub const DIVIDER: &str = "|";
 pub const FAILED: &str = "\u{f04e7}";
 pub const FEATURE: &str = "\u{f0eb} ";
 pub const GIT: &str = "\u{f418} ";
@@ -44,6 +43,8 @@ pub const MODIFIED: &str = "\u{f1787} ";
 pub const NEW: &str = "\u{f0a0} ";
 pub const RELEASE: &str = "\u{f296} ";
 pub const RENAMED: &str = "\u{ebcb} ";
+// Marks the end of the git segment, keeping it off whatever tmux draws next.
+// Inside the segment, groups are separated by plain spaces.
 pub const SEPARATOR: &str = "\u{e621}";
 pub const STAGED: &str = "\u{f01c} ";
 pub const STASHED: &str = "\u{e257} ";

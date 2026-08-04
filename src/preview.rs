@@ -12,7 +12,7 @@ use crate::{
     segments::git::{Area, GitStatus, status_line_capped, status_line_styled},
     tmux::{
         format::{BG_BAR, Style},
-        icons::{ARROW_RIGHT, CAP_CHEVRON, CAP_EIGHTH, CAP_NONE, CAP_RULE, CAP_SLASH},
+        icons::{ARROW_RIGHT, CAP_CHEVRON, CAP_EIGHTH, CAP_NONE, CAP_RULE, CAP_SLASH, SEPARATOR},
     },
 };
 
@@ -161,7 +161,8 @@ fn states() -> Vec<(&'static str, GitStatus)> {
 /// End-cap candidates for the outline styles, shown after the style sections.
 fn caps() -> Vec<(&'static str, &'static str)> {
     vec![
-        ("solid triangle (now)", ARROW_RIGHT),
+        ("separator e621 (now)", SEPARATOR),
+        ("solid triangle", ARROW_RIGHT),
         ("thin slash", CAP_SLASH),
         ("thin chevron", CAP_CHEVRON),
         ("vertical rule", CAP_RULE),

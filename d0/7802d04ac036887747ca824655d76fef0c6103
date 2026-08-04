@@ -1,0 +1,35 @@
+src/segments/network.rs
+  s_b9a954f56f9448::t_f0da79b9d1521b 7-9,13
+  s_b9a954f56f9448::t_7a2c4c5b518ef6 115-124
+  s_b9a954f56f9448::t_5ce4d3f056b5bf 95-96,101-102,108-112
+  s_b9a954f56f9448::t_0e96be58ab1ab0 107,113-114
+  s_b9a954f56f9448::t_d1b746b40c44b8 138
+  s_b9a954f56f9448::t_2a194bdf542ddd 3
+  s_b9a954f56f9448::t_b58f239f3ad516 15,17,19,21
+  s_b9a954f56f9448::t_216110b462adf8 196,204
+  s_b9a954f56f9448::t_77dc6039009860 221-223
+  s_b9a954f56f9448::t_806c552d56414e 243
+src/segments/window.rs
+  s_b9a954f56f9448::t_ffd3aedcac9387 210-217
+  s_b9a954f56f9448::t_d7d31581dc353d 764,772-773,777-792,796
+src/tmux/icons.rs
+  s_b9a954f56f9448::t_3aed48946be8a7 12-16
+  s_b9a954f56f9448::t_2c66d26e154780 17-19
+  s_b9a954f56f9448::t_f08344809e3198 20-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "d07802d04ac036887747ca824655d76fef0c6103",
+  "prompts": {},
+  "sessions": {
+    "s_b9a954f56f9448": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5ba2afb7-9525-4019-80a4-dd72c3d5ff4d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Yogesh <yogesh@lonkar.org>"
+    }
+  }
+}

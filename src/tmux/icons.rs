@@ -2,7 +2,8 @@
 pub const ADDED: &str = "\u{f034c} ";
 pub const AHEAD: &str = "\u{f40a} ";
 pub const ARROW_RIGHT: &str = "\u{e0bc}";
-pub const ARROW_LEFT: &str = "\u{e0be}";
+// Lower-right triangle separator; used only by the net segment.
+pub const ARROW_LEFT: &str = "\u{e0ba}";
 pub const BEHIND: &str = "\u{f409} ";
 pub const BUGFIX: &str = "\u{f188} ";
 pub const CHORE: &str = "\u{f19a1} ";

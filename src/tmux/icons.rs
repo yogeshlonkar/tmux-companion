@@ -20,6 +20,14 @@ pub const RATE_KIB: &str = "K";
 pub const RATE_MIB: &str = "M";
 // pub const RATE_GIB: &str = "\u{f0af4}";
 pub const RATE_GIB: &str = "G";
+// Outline-style end caps.  ARROW_RIGHT is a solid triangle: it works as the
+// boundary of a filled segment, but with no fill behind it it floats.  These
+// are thin alternatives — preview them with `tmux-companion preview`.
+pub const CAP_SLASH: &str = " \u{e0bd}"; // thin slash, same slant as ARROW_RIGHT
+pub const CAP_CHEVRON: &str = " \u{e0b1}"; // thin right chevron
+pub const CAP_RULE: &str = " \u{2502}"; // plain vertical rule
+pub const CAP_EIGHTH: &str = " \u{258f}"; // left one-eighth block
+pub const CAP_NONE: &str = ""; // nothing at all
 pub const BEHIND: &str = "\u{f409} ";
 pub const BUGFIX: &str = "\u{f188} ";
 pub const CHORE: &str = "\u{f19a1} ";

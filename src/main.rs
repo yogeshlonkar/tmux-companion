@@ -1,5 +1,6 @@
 mod client;
 mod db;
+mod preview;
 mod proto;
 mod segments;
 mod server;
@@ -33,7 +34,13 @@ enum Cmd {
         /// Bypass the cache and force a fresh git status fetch
         #[arg(short = 'f', long, action = clap::ArgAction::SetTrue)]
         force: bool,
+        /// Color style: fill (solid background), outline, outline-bright
+        #[arg(short = 's', long, default_value = "outline-bright")]
+        style: String,
     },
+
+    /// Print sample git segments in every color style (local, no server)
+    Preview,
 
     /// Battery status segment
     Battery,
@@ -98,16 +105,20 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Server => {
             server::run().await?;
         }
-        Cmd::Gst { path, pane_pid, force } => {
+        Cmd::Gst { path, pane_pid, force, style } => {
             let req = Request {
                 cmd: "gst".into(),
                 args: serde_json::json!({
                     "path": path.as_ref().map(|p| p.to_string_lossy().into_owned()),
                     "pane_pid": pane_pid,
                     "force": force,
+                    "style": style,
                 }),
             };
             client::send_and_print(req).await?;
+        }
+        Cmd::Preview => {
+            print!("{}", preview::render());
         }
         Cmd::Battery => {
             client::send_and_print(Request {

@@ -1,0 +1,29 @@
+src/server/handlers.rs
+  s_5a378a5f42f65a::t_8748b949a2909b 21-22
+src/main.rs
+  s_5a378a5f42f65a::t_2498535f145c2c 40-42
+  s_5a378a5f42f65a::t_1e2bde269d0de8 114-115,123
+  s_5a378a5f42f65a::t_025712f7fe88c5 111-113
+  s_5a378a5f42f65a::t_4afd751544b32d 61,109-110,145-148,179-183
+src/segments/git.rs
+  s_5a378a5f42f65a::t_0220d63308ccaa 547,549-550
+  s_5a378a5f42f65a::t_6484b8a628cd26 461-463
+  s_5a378a5f42f65a::t_5a388c08f0a9d1 574-575
+  s_5a378a5f42f65a::t_1061e628289ef5 585-586
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "4d8498f22800896d7dd38613567835d1ccfd89f4",
+  "prompts": {},
+  "sessions": {
+    "s_5a378a5f42f65a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "27eeacdc-9992-4503-8fa2-a2078bd52e42",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Yogesh <yogesh@lonkar.org>"
+    }
+  }
+}

@@ -458,7 +458,9 @@ pub fn status_line_capped(
 
     status_line.add(sub.join(WHITE_SPACE));
 
-    if no_tmux {
+    if p.cap_glyph.is_empty() {
+        // no end cap requested (e.g. segment sits at the start of status-right)
+    } else if no_tmux {
         status_line.append(&format!(
             "\x1b[0m\x1b[38;5;{}m{}\x1b[0m",
             p.cap, p.cap_glyph
@@ -542,7 +544,10 @@ pub async fn render(
     pid: Option<u32>,
     force: bool,
     style: Style,
+    no_cap: bool,
 ) -> anyhow::Result<String> {
+    // empty cap glyph = status_line_capped skips the end cap entirely
+    let cap = if no_cap { Some("") } else { None };
     let path = match path {
         Some(p) => p.canonicalize()?,
         None => std::env::current_dir()?,
@@ -566,7 +571,8 @@ pub async fn render(
         let cached =
             tokio::task::spawn_blocking(move || crate::db::get_git_status(&id_c, 2)).await??;
         if let Some(status) = cached {
-            return Ok(status_line_styled(&status, nvim_suspended, false, style));
+            let line = status_line_capped(&status, nvim_suspended, false, style, cap);
+            return Ok(if no_cap { line.trim_end().to_string() } else { line });
         }
     }
 
@@ -576,7 +582,8 @@ pub async fn render(
     let s_clone = status.clone();
     tokio::task::spawn_blocking(move || crate::db::save_git_status(&id_c, &s_clone)).await??;
 
-    Ok(status_line_styled(&status, nvim_suspended, false, style))
+    let line = status_line_capped(&status, nvim_suspended, false, style, cap);
+    Ok(if no_cap { line.trim_end().to_string() } else { line })
 }
 
 #[cfg(test)]

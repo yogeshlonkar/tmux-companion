@@ -1,18 +1,18 @@
 # tmux-companion
 
-*Status bar*
+_Status bar_
 
 ![screenshot-tmux-status-bar.png](./screenshot-tmux-status-bar.png)
 
-*Left*
+_Left_
 
 ![screenshot-tmux-status-bar-left.png](./screenshot-tmux-status-bar-left.png)
 
-*Middle*
+_Middle_
 
 ![screenshot-tmux-status-bar-middle.png](./screenshot-tmux-status-bar-middle.png)
 
-*Right*
+_Right_
 
 ![screenshot-tmux-status-bar-right.png](./screenshot-tmux-status-bar-right.png)
 
@@ -22,7 +22,7 @@ A single self-contained Rust binary that replaces a collection of shell scripts
 and a Go tool (`yrl gst`) used to drive tmux status-line segments.
 
 Instead of spawning six short-lived processes every second, tmux-companion runs
-as a persistent background daemon.  Each tmux refresh sends a lightweight JSON
+as a persistent background daemon. Each tmux refresh sends a lightweight JSON
 request over a Unix socket and prints the result — no process startup overhead,
 no re-reading config files, no repeated disk I/O.
 
@@ -30,14 +30,14 @@ no re-reading config files, no repeated disk I/O.
 
 ## Segments
 
-| Subcommand | Replaces | What it shows |
-|------------|----------|---------------|
-| `gst [PATH]` | `yrl gst` | Powerline git-status segment |
-| `window …` | `window-status.zsh` | Window index icon, abbreviated path, process dot, alert flags |
-| `battery` | `battery-life.zsh` | Battery percentage and icon (macOS) |
-| `net` | `net-monitor.zsh` | Download / upload bandwidth |
-| `clients <sa> <wac>` | `check-clients.zsh` | Other tmux clients connected to the same server |
-| `vim-bg <pid>` | `check-vim-in-background.zsh` | Suspended nvim in current pane |
+| Subcommand           | Replaces                      | What it shows                                                 |
+| -------------------- | ----------------------------- | ------------------------------------------------------------- |
+| `gst [PATH]`         | `yrl gst`                     | Powerline git-status segment                                  |
+| `window …`           | `window-status.zsh`           | Window index icon, abbreviated path, process dot, alert flags |
+| `battery`            | `battery-life.zsh`            | Battery percentage and icon (macOS)                           |
+| `net`                | `net-monitor.zsh`             | Download / upload bandwidth                                   |
+| `clients <sa> <wac>` | `check-clients.zsh`           | Other tmux clients connected to the same server               |
+| `vim-bg <pid>`       | `check-vim-in-background.zsh` | Suspended nvim in current pane                                |
 
 All subcommands speak to the same daemon; only `server` starts the daemon itself.
 
@@ -68,11 +68,16 @@ set -ga status-right " #(tmux-companion net)#[fg=color237]#[bg=colour237]#(tmux-
 
 set -g  window-status-current-format \
   "#(tmux-companion window -c -i #I -n '#W' -w '#{pane_current_path}' \
-     -p '#{pane_current_command}' -s '#{pane_start_path}' -I #{window_id} -f '#{window_flags}')"
+     -p '#{pane_current_command}' -s '#{pane_start_path}' -I #{window_id} -f '#{window_flags}' \
+     -P #{window_panes} -A #{pane_index})"
 set -g  window-status-format \
   "#(tmux-companion window -i #I -n '#W' -w '#{pane_current_path}' \
-     -p '#{pane_current_command}' -I #{window_id} -f '#{window_flags}')"
+     -p '#{pane_current_command}' -I #{window_id} -f '#{window_flags}' \
+     -P #{window_panes} -A #{pane_index})"
 ```
+
+`-P` / `-A` add a numeric-circle suffix with the active pane index, shown only
+when the window holds more than one pane.
 
 ## The `gst` segment in detail
 
@@ -93,25 +98,25 @@ Segment anatomy (left → right):
 
 Background colours change with repo state:
 
-| State | Colour |
-|-------|--------|
-| Clean | Green (120) |
-| New branch | Light grey (251) |
-| Gone upstream | Dark red (088) |
-| Dirty / ahead / behind | Orange (209) |
+| State                  | Colour           |
+| ---------------------- | ---------------- |
+| Clean                  | Green (120)      |
+| New branch             | Light grey (251) |
+| Gone upstream          | Dark red (088)   |
+| Dirty / ahead / behind | Orange (209)     |
 
 ## Server lifecycle
 
 The daemon starts automatically when any client subcommand is invoked and no
-server is listening on the socket yet.  It runs until the system restarts or
-until it is killed explicitly.  Because it lives inside the user's tmux session
+server is listening on the socket yet. It runs until the system restarts or
+until it is killed explicitly. Because it lives inside the user's tmux session
 lifetime, no init-system integration is needed.
 
 Socket: `/tmp/tmux-companion-<uid>.sock`
 
 ## Building
 
-Requires Rust 1.82+ (edition 2024).  SQLite is bundled — no system library
+Requires Rust 1.82+ (edition 2024). SQLite is bundled — no system library
 needed.
 
 ```sh

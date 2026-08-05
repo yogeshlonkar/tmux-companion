@@ -9,15 +9,22 @@ use serde::{Deserialize, Serialize};
 
 use crate::tmux::{
     format::{
-        BG_CLEAN, BG_DEFAULT, BG_ERROR, BG_GONE, BG_LOADING, BG_NEW, BG_TERMINAL, FG_BLUE,
-        FG_CLEAN, FG_DARK_BLUE, FG_DEFAULT, FG_GONE, FG_GREEN, FG_GREY89, FG_PREVIOUS, FG_PURPLE,
-        Segment, colored_segment, powerline_segment,
+        AC_DARK_BLUE, AC_GONE, AC_GREEN, AC_LOADING, AC_NEW, AC_PURPLE, BG_BAR, BG_CLEAN,
+        BG_DEFAULT, BG_ERROR, BG_GONE, BG_LOADING, BG_NEW, BG_TERMINAL, FG_BLUE, FG_CLEAN,
+        FG_DARK_BLUE, FG_DEFAULT, FG_GONE, FG_GREEN, FG_GREY89, FG_PREVIOUS, FG_PURPLE, Palette,
+        Segment, Style, colored_segment, powerline_segment,
     },
     icons::{
-        ADDED, AHEAD, ARROW_RIGHT, BEHIND, CLEAN, COPIED, DELETED, DIVIDER, FAILED, GIT, MODIFIED,
-        NEW, RENAMED, SEPARATOR, STAGED, STASHED, SYNC, UNMERGED, WHITE_SPACE,
+        ADDED, AHEAD, ARROW_RIGHT, BEHIND, CLEAN, COPIED, DELETED, FAILED, GIT, MODIFIED, NEW,
+        RENAMED, STAGED, STASHED, SYNC, UNMERGED, WHITE_SPACE,
     },
 };
+
+/// End cap for the outline styles.  The fill style ends with a solid arrow
+/// against the bar; outline has no fill to bound, so it ends with SEPARATOR to
+/// keep clear of the next segment.  Swap for any `CAP_*` icon —
+/// `tmux-companion preview` renders the alternatives side by side.
+const OUTLINE_CAP: &str = crate::tmux::icons::SEPARATOR;
 
 const BRANCH_MAX_LEN: usize = 20;
 const HEAD_LEN: usize = 8;
@@ -194,6 +201,64 @@ impl GitStatus {
             FG_DEFAULT
         }
     }
+
+    /// Outline text color: the state color the fill style uses as background,
+    /// lightened where the fill value would vanish on the dark bar.
+    fn accent(&self, bright: bool) -> &'static str {
+        match (self.bg(), bright) {
+            (BG_GONE, true) => AC_GONE,
+            (bg, _) => bg,
+        }
+    }
+
+    fn palette(&self, style: Style, bar_bg: &'static str) -> Palette {
+        match style {
+            Style::Fill => Palette {
+                bg: self.bg(),
+                fg: self.fg(),
+                reset_fg: BG_TERMINAL,
+                cap: self.bg(),
+                cap_glyph: ARROW_RIGHT,
+                loading_fg: FG_GREY89,
+                loading_bg: BG_LOADING,
+                loading_cap: BG_LOADING,
+                error_fg: FG_GREY89,
+                error_bg: BG_ERROR,
+                error_cap: BG_ERROR,
+                prev_fg: FG_PREVIOUS,
+                new_fg: FG_BLUE,
+                green_fg: FG_GREEN,
+                dirty_fg: BG_GONE,
+                ahead_fg: FG_DARK_BLUE,
+                unmerged_fg: BG_ERROR,
+                stash_fg: FG_PURPLE,
+            },
+            Style::Outline | Style::OutlineBright => {
+                let bright = style == Style::OutlineBright;
+                let accent = self.accent(bright);
+                Palette {
+                    bg: bar_bg,
+                    fg: accent,
+                    reset_fg: accent,
+                    cap: accent,
+                    cap_glyph: OUTLINE_CAP,
+                    loading_fg: if bright { AC_LOADING } else { BG_LOADING },
+                    loading_bg: bar_bg,
+                    loading_cap: if bright { AC_LOADING } else { BG_LOADING },
+                    error_fg: BG_ERROR,
+                    error_bg: bar_bg,
+                    error_cap: BG_ERROR,
+                    prev_fg: accent,
+                    new_fg: if bright { AC_NEW } else { FG_BLUE },
+                    green_fg: if bright { AC_GREEN } else { FG_GREEN },
+                    dirty_fg: if bright { AC_GONE } else { BG_GONE },
+                    ahead_fg: if bright { AC_DARK_BLUE } else { FG_DARK_BLUE },
+                    unmerged_fg: BG_ERROR,
+                    stash_fg: if bright { AC_PURPLE } else { FG_PURPLE },
+                }
+            }
+        }
+    }
 }
 
 fn short_branch(branch: &str) -> String {
@@ -235,15 +300,40 @@ fn short_branch(branch: &str) -> String {
     format!("{}{}", icon, truncated)
 }
 
-pub fn status_line(s: &GitStatus, nvim_suspended: bool) -> String {
-    status_line_mode(s, nvim_suspended, false)
+/// Fill-style render — the shape the test suite pins.  Production goes through
+/// `status_line_styled`.
+#[cfg(test)]
+pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> String {
+    status_line_styled(s, nvim_suspended, no_tmux, Style::Fill)
 }
 
-pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> String {
-    let bg = s.bg();
-    let fg = s.fg();
-    let reset = colored_segment(no_tmux, BG_TERMINAL, bg, "");
-    let reset_ws = colored_segment(no_tmux, BG_TERMINAL, bg, WHITE_SPACE);
+pub fn status_line_styled(
+    s: &GitStatus,
+    nvim_suspended: bool,
+    no_tmux: bool,
+    style: Style,
+) -> String {
+    status_line_capped(s, nvim_suspended, no_tmux, style, None)
+}
+
+/// Same render, with the end-cap glyph overridable — used by `preview` to show
+/// cap candidates side by side.
+pub fn status_line_capped(
+    s: &GitStatus,
+    nvim_suspended: bool,
+    no_tmux: bool,
+    style: Style,
+    cap_glyph: Option<&'static str>,
+) -> String {
+    let bar_bg = if nvim_suspended { BG_TERMINAL } else { BG_BAR };
+    let mut p = s.palette(style, bar_bg);
+    if let Some(g) = cap_glyph {
+        p.cap_glyph = g;
+    }
+    let bg = p.bg;
+    let fg = p.fg;
+    let reset = colored_segment(no_tmux, p.reset_fg, bg, "");
+    let reset_ws = colored_segment(no_tmux, p.reset_fg, bg, WHITE_SPACE);
 
     let mut status_line = Segment::new();
     let mut remote = Segment::new();
@@ -251,24 +341,24 @@ pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> S
     if s.loading {
         remote.add(colored_segment(
             no_tmux,
-            FG_GREY89,
-            BG_LOADING,
+            p.loading_fg,
+            p.loading_bg,
             &format!("{}{}{}", WHITE_SPACE, SYNC, WHITE_SPACE),
         ));
         remote.add(format!(
             "{}{}",
-            colored_segment(no_tmux, BG_LOADING, bg, ARROW_RIGHT),
+            colored_segment(no_tmux, p.loading_cap, bg, ARROW_RIGHT),
             ""
         ));
     } else if s.remote_success {
-        remote.add(colored_segment(no_tmux, FG_PREVIOUS, bg, WHITE_SPACE));
+        remote.add(colored_segment(no_tmux, p.prev_fg, bg, WHITE_SPACE));
     } else {
-        remote.add(colored_segment(no_tmux, FG_PREVIOUS, BG_ERROR, ARROW_RIGHT));
-        remote.add(colored_segment(no_tmux, FG_GREY89, BG_ERROR, WHITE_SPACE));
+        remote.add(colored_segment(no_tmux, p.prev_fg, p.error_bg, ARROW_RIGHT));
+        remote.add(colored_segment(no_tmux, p.error_fg, p.error_bg, WHITE_SPACE));
         remote.add(format!("{}{}", FAILED, WHITE_SPACE));
         remote.add(format!(
             "{}{}",
-            colored_segment(no_tmux, BG_ERROR, bg, ""),
+            colored_segment(no_tmux, p.error_cap, bg, ""),
             ARROW_RIGHT
         ));
     }
@@ -278,13 +368,13 @@ pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> S
         colored_segment(no_tmux, fg, bg, ""),
         GIT,
         short_branch(&s.branch),
-        SEPARATOR
+        WHITE_SPACE
     ));
 
     if s.is_new {
         remote.add(format!(
             "{}{}",
-            colored_segment(no_tmux, FG_BLUE, bg, NEW),
+            colored_segment(no_tmux, p.new_fg, bg, NEW),
             reset
         ));
     } else if s.is_gone {
@@ -292,13 +382,13 @@ pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> S
     } else if s.is_clean() {
         remote.add(format!(
             "{}{}",
-            colored_segment(no_tmux, FG_GREEN, bg, CLEAN),
+            colored_segment(no_tmux, p.green_fg, bg, CLEAN),
             reset_ws
         ));
     } else if s.is_dirty() {
         remote.add(format!(
             "{}{}",
-            colored_segment(no_tmux, BG_GONE, bg, ""),
+            colored_segment(no_tmux, p.dirty_fg, bg, ""),
             reset
         ));
     }
@@ -314,7 +404,7 @@ pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> S
         s.ahead,
         &format!(
             "{}{}",
-            colored_segment(no_tmux, FG_DARK_BLUE, bg, AHEAD),
+            colored_segment(no_tmux, p.ahead_fg, bg, AHEAD),
             reset
         ),
     );
@@ -322,13 +412,13 @@ pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> S
         s.behind,
         &format!(
             "{}{}",
-            colored_segment(no_tmux, FG_DARK_BLUE, bg, BEHIND),
+            colored_segment(no_tmux, p.ahead_fg, bg, BEHIND),
             reset
         ),
     );
     branch.counter(
         s.unmerged,
-        &colored_segment(no_tmux, BG_ERROR, bg, UNMERGED),
+        &colored_segment(no_tmux, p.unmerged_fg, bg, UNMERGED),
     );
     branch.append_only(&reset);
     sub.when(!branch.is_empty(), &branch.to_string());
@@ -351,7 +441,7 @@ pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> S
     staged.counter(s.staged.modified, MODIFIED);
     staged.prepend_only(&format!(
         "{}{}",
-        colored_segment(no_tmux, FG_GREEN, bg, STAGED),
+        colored_segment(no_tmux, p.green_fg, bg, STAGED),
         reset
     ));
     sub.when(!staged.is_empty(), &staged.to_string());
@@ -361,18 +451,22 @@ pub fn status_line_mode(s: &GitStatus, nvim_suspended: bool, no_tmux: bool) -> S
         s.stashed,
         &format!(
             "{}{}",
-            colored_segment(no_tmux, FG_PURPLE, bg, STASHED),
+            colored_segment(no_tmux, p.stash_fg, bg, STASHED),
             reset
         ),
     );
 
-    status_line.add(sub.join(DIVIDER));
+    status_line.add(sub.join(WHITE_SPACE));
 
-    if no_tmux {
-        status_line.append(&format!("\x1b[0m\x1b[38;5;{}m{}\x1b[0m", bg, ARROW_RIGHT));
+    if p.cap_glyph.is_empty() {
+        // no end cap requested (e.g. segment sits at the start of status-right)
+    } else if no_tmux {
+        status_line.append(&format!(
+            "\x1b[0m\x1b[38;5;{}m{}\x1b[0m",
+            p.cap, p.cap_glyph
+        ));
     } else {
-        let bg_color = if nvim_suspended { BG_TERMINAL } else { "233" };
-        status_line.append(&powerline_segment(bg, bg_color, ARROW_RIGHT));
+        status_line.append(&powerline_segment(p.cap, bar_bg, p.cap_glyph));
     }
 
     status_line.to_string()
@@ -449,7 +543,11 @@ pub async fn render(
     path: Option<PathBuf>,
     pid: Option<u32>,
     force: bool,
+    style: Style,
+    no_cap: bool,
 ) -> anyhow::Result<String> {
+    // empty cap glyph = status_line_capped skips the end cap entirely
+    let cap = if no_cap { Some("") } else { None };
     let path = match path {
         Some(p) => p.canonicalize()?,
         None => std::env::current_dir()?,
@@ -473,7 +571,8 @@ pub async fn render(
         let cached =
             tokio::task::spawn_blocking(move || crate::db::get_git_status(&id_c, 2)).await??;
         if let Some(status) = cached {
-            return Ok(status_line(&status, nvim_suspended));
+            let line = status_line_capped(&status, nvim_suspended, false, style, cap);
+            return Ok(if no_cap { line.trim_end().to_string() } else { line });
         }
     }
 
@@ -483,7 +582,8 @@ pub async fn render(
     let s_clone = status.clone();
     tokio::task::spawn_blocking(move || crate::db::save_git_status(&id_c, &s_clone)).await??;
 
-    Ok(status_line(&status, nvim_suspended))
+    let line = status_line_capped(&status, nvim_suspended, false, style, cap);
+    Ok(if no_cap { line.trim_end().to_string() } else { line })
 }
 
 #[cfg(test)]
@@ -491,9 +591,9 @@ mod tests {
     use super::*;
     use crate::tmux::{
         format::{
-            BG_CLEAN, BG_DEFAULT, BG_ERROR, BG_GONE, BG_LOADING, BG_NEW, BG_TERMINAL,
-            FG_CLEAN, FG_DARK_BLUE, FG_DEFAULT, FG_GONE, FG_GREEN, FG_PREVIOUS,
-            FG_PURPLE, colored_segment, powerline_segment,
+            AC_DARK_BLUE, AC_GONE, AC_PURPLE, BG_BAR, BG_CLEAN, BG_DEFAULT, BG_ERROR, BG_GONE,
+            BG_LOADING, BG_NEW, BG_TERMINAL, FG_CLEAN, FG_DARK_BLUE, FG_DEFAULT, FG_GONE,
+            FG_GREEN, FG_PREVIOUS, FG_PURPLE, Style, colored_segment, powerline_segment,
         },
         icons::*,
     };
@@ -545,7 +645,7 @@ mod tests {
             colored_segment(no_tmux, fg, bg, ""),
             GIT,
             short_branch(branch),
-            SEPARATOR
+            WHITE_SPACE
         )
     }
     fn arrow(bg: &str, no_tmux: bool) -> String {
@@ -1108,8 +1208,10 @@ mod tests {
         assert!(line.contains(ADDED));
         assert!(line.contains(STAGED));
         assert!(line.contains(STASHED));
-        // Dividers between sub-sections
-        assert!(line.contains(DIVIDER));
+        // Sub-sections are separated by plain spaces, and only the segment end
+        // carries a glyph.
+        assert!(!line.contains('|'), "stale pipe divider: {line}");
+        assert_eq!(line.matches(SEPARATOR).count(), 0, "fill ends with an arrow: {line}");
         // untracked(1) + unstaged.added(1) → count 2
         assert!(line.contains(&format!("2{}", ADDED)));
     }
@@ -1190,6 +1292,155 @@ mod tests {
         assert!(suspended.contains(&format!("bg=color{}]{}", BG_TERMINAL, ARROW_RIGHT)),
             "suspended arrow bg should be BG_TERMINAL: {suspended}");
         assert_ne!(normal, suspended);
+    }
+
+    // ── styles ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn fill_style_matches_legacy_render() {
+        let s = s_dirty_all();
+        assert_eq!(
+            status_line_mode(&s, false, false),
+            status_line_styled(&s, false, false, Style::Fill)
+        );
+    }
+
+    #[test]
+    fn outline_puts_state_color_in_foreground_and_bar_in_background() {
+        let s = s_clean();
+        let line = status_line_styled(&s, false, false, Style::Outline);
+        // Clean state color moves from background to foreground.
+        assert!(
+            line.contains(&format!("fg=color{},bg=color{}]", BG_CLEAN, BG_BAR)),
+            "state color should be the text color: {line}"
+        );
+        assert!(
+            !line.contains(&format!("bg=color{}]", BG_CLEAN)),
+            "no solid fill left: {line}"
+        );
+    }
+
+    #[test]
+    fn outline_keeps_icon_colors_untouched() {
+        let s = GitStatus {
+            stashed: 1,
+            ..s_clean()
+        };
+        let line = status_line_styled(&s, false, false, Style::Outline);
+        // Stash icon keeps FG_PURPLE, only its background changes.
+        assert!(line.contains(&colored_segment(false, FG_PURPLE, BG_BAR, STASHED)));
+        // Clean icon keeps FG_GREEN.
+        assert!(line.contains(&colored_segment(false, FG_GREEN, BG_BAR, CLEAN)));
+    }
+
+    #[test]
+    fn outline_bright_lightens_icon_colors() {
+        let s = GitStatus {
+            stashed: 1,
+            ahead: 1,
+            ..s_clean()
+        };
+        let line = status_line_styled(&s, false, false, Style::OutlineBright);
+        assert!(line.contains(&colored_segment(false, AC_PURPLE, BG_BAR, STASHED)));
+        assert!(line.contains(&colored_segment(false, AC_DARK_BLUE, BG_BAR, AHEAD)));
+        assert!(!line.contains(&format!("fg=color{}", FG_PURPLE)));
+    }
+
+    #[test]
+    fn outline_bright_lightens_the_gone_state_color() {
+        let s = GitStatus {
+            is_gone: true,
+            ..s_clean()
+        };
+        let plain = status_line_styled(&s, false, false, Style::Outline);
+        let bright = status_line_styled(&s, false, false, Style::OutlineBright);
+        assert!(plain.contains(&format!("fg=color{}", BG_GONE)));
+        assert!(bright.contains(&format!("fg=color{}", AC_GONE)));
+    }
+
+    #[test]
+    fn outline_error_and_loading_backgrounds_flatten_to_the_bar() {
+        let failed = status_line_styled(
+            &GitStatus {
+                branch: "b".into(),
+                ..Default::default()
+            },
+            false,
+            false,
+            Style::Outline,
+        );
+        assert!(!failed.contains(&format!("bg=color{}]", BG_ERROR)), "{failed}");
+        assert!(failed.contains(&format!("fg=color{}", BG_ERROR)), "{failed}");
+
+        let loading = status_line_styled(
+            &GitStatus {
+                branch: "b".into(),
+                loading: true,
+                ..Default::default()
+            },
+            false,
+            false,
+            Style::Outline,
+        );
+        assert!(!loading.contains(&format!("bg=color{}]", BG_LOADING)), "{loading}");
+        assert!(loading.contains(&format!("fg=color{}", BG_LOADING)), "{loading}");
+    }
+
+    #[test]
+    fn fill_ends_with_the_solid_arrow() {
+        let s = s_clean();
+        let line = status_line_styled(&s, false, false, Style::Fill);
+        assert!(line.ends_with(&powerline_segment(BG_CLEAN, BG_BAR, ARROW_RIGHT)));
+    }
+
+    #[test]
+    fn outline_ends_with_the_separator_glyph() {
+        let s = s_clean();
+        let line = status_line_styled(&s, false, false, Style::Outline);
+        assert!(line.ends_with(&powerline_segment(BG_CLEAN, BG_BAR, SEPARATOR)));
+        // The solid triangle must not survive into an outline render.
+        assert!(!line.contains(ARROW_RIGHT), "solid arrow left over: {line}");
+    }
+
+    #[test]
+    fn separator_appears_once_and_only_at_the_end() {
+        let line = status_line_styled(&s_dirty_all(), false, false, Style::OutlineBright);
+        assert_eq!(line.matches(SEPARATOR).count(), 1, "{line}");
+        assert!(line.ends_with(SEPARATOR), "{line}");
+        assert!(!line.contains('|'), "stale pipe divider: {line}");
+    }
+
+    #[test]
+    fn cap_override_replaces_the_end_cap() {
+        let s = s_clean();
+        let line = status_line_capped(&s, false, false, Style::Outline, Some(CAP_RULE));
+        assert!(line.ends_with(&powerline_segment(BG_CLEAN, BG_BAR, CAP_RULE)));
+    }
+
+    #[test]
+    fn cap_override_does_not_leak_into_the_default() {
+        let s = s_clean();
+        let _ = status_line_capped(&s, false, false, Style::Outline, Some(CAP_RULE));
+        let plain = status_line_styled(&s, false, false, Style::Outline);
+        assert!(!plain.contains(CAP_RULE.trim()), "{plain}");
+    }
+
+    #[test]
+    fn outline_respects_nvim_suspended_bar_background() {
+        let s = s_clean();
+        let line = status_line_styled(&s, true, false, Style::Outline);
+        assert!(line.contains(&format!("bg=color{}]", BG_TERMINAL)), "{line}");
+        assert!(!line.contains(&format!("bg=color{}]", BG_BAR)), "{line}");
+    }
+
+    #[test]
+    fn style_parse_accepts_known_names_only() {
+        assert_eq!(Style::parse("fill"), Some(Style::Fill));
+        assert_eq!(Style::parse("outline"), Some(Style::Outline));
+        assert_eq!(Style::parse("outline-bright"), Some(Style::OutlineBright));
+        assert_eq!(Style::parse("bright"), Some(Style::OutlineBright));
+        assert_eq!(Style::parse("nope"), None);
+        assert_eq!(Style::default(), Style::OutlineBright);
     }
 
     // ── count_stash ───────────────────────────────────────────────────────────

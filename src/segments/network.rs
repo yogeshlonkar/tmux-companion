@@ -1,21 +1,24 @@
 use std::time::Instant;
 
-use crate::tmux::icons::ARROW_LEFT;
+use crate::tmux::icons::{ARROW_LEFT, RATE_GIB, RATE_KIB, RATE_MIB};
 
 const THRESHOLD_BPS: u64 = 20_480; // 20 KiB/s default threshold
 
+/// Format a byte rate. Each multiple-of-1024 unit is a single glyph rather than
+/// spelled-out text, so the segment stays narrow; plain bytes keep their text
+/// form.
 fn iec_fmt(bytes_per_sec: u64, pad: usize) -> String {
     const K: u64 = 1024;
     let (val, unit) = if bytes_per_sec >= K * K * K {
-        (bytes_per_sec / (K * K * K), "GiB")
+        (bytes_per_sec / (K * K * K), RATE_GIB)
     } else if bytes_per_sec >= K * K {
-        (bytes_per_sec / (K * K), "MiB")
+        (bytes_per_sec / (K * K), RATE_MIB)
     } else if bytes_per_sec >= K {
-        (bytes_per_sec / K, "KiB")
+        (bytes_per_sec / K, RATE_KIB)
     } else {
-        (bytes_per_sec, "B")
+        (bytes_per_sec, "B/s")
     };
-    format!("{:>pad$}{}/s", val, unit)
+    format!("{:>pad$}{}", val, unit)
 }
 
 /// Style the unit part of a speed string: `20KiB/s` → `20#[fg=colour237,none,italics]KiB/s#[none]`.
@@ -89,19 +92,36 @@ mod tests {
 
     #[test]
     fn iec_fmt_kib() {
-        assert_eq!(iec_fmt(2048, 0), "2KiB/s");
-        assert_eq!(iec_fmt(1024, 0), "1KiB/s");
+        assert_eq!(iec_fmt(2048, 0), format!("2{}", RATE_KIB));
+        assert_eq!(iec_fmt(1024, 0), format!("1{}", RATE_KIB));
     }
 
     #[test]
     fn iec_fmt_mib() {
-        assert_eq!(iec_fmt(1024 * 1024, 0), "1MiB/s");
-        assert_eq!(iec_fmt(3 * 1024 * 1024, 0), "3MiB/s");
+        assert_eq!(iec_fmt(1024 * 1024, 0), format!("1{}", RATE_MIB));
+        assert_eq!(iec_fmt(3 * 1024 * 1024, 0), format!("3{}", RATE_MIB));
     }
 
     #[test]
     fn iec_fmt_gib() {
-        assert_eq!(iec_fmt(2 * 1024 * 1024 * 1024, 0), "2GiB/s");
+        assert_eq!(iec_fmt(2 * 1024 * 1024 * 1024, 0), format!("2{}", RATE_GIB));
+    }
+
+    #[test]
+    fn iec_fmt_units_are_distinct() {
+        assert_ne!(RATE_KIB, RATE_MIB);
+        assert_ne!(RATE_MIB, RATE_GIB);
+        assert_ne!(RATE_KIB, RATE_GIB);
+    }
+
+    #[test]
+    fn rate_units_never_start_with_a_digit() {
+        // iec_fmt_styled splits the number from the unit at the first non-digit
+        // character, so a unit that opened with a digit would be mis-split.
+        for unit in [RATE_KIB, RATE_MIB, RATE_GIB] {
+            let first = unit.chars().next().expect("unit is non-empty");
+            assert!(!first.is_ascii_digit(), "unit must not start with a digit: {unit}");
+        }
     }
 
     #[test]
@@ -115,7 +135,7 @@ mod tests {
     #[test]
     fn iec_fmt_boundary_exactly_kib() {
         // 1024 B/s = exactly 1 KiB/s
-        assert_eq!(iec_fmt(1024, 0), "1KiB/s");
+        assert_eq!(iec_fmt(1024, 0), format!("1{}", RATE_KIB));
         // 1023 B/s stays in B
         assert_eq!(iec_fmt(1023, 0), "1023B/s");
     }
@@ -173,7 +193,7 @@ mod tests {
     fn iec_fmt_styled_kib() {
         assert_eq!(
             iec_fmt_styled(2048),
-            "2#[fg=colour237,none,italics]KiB/s#[none]"
+            format!("2#[fg=colour237,none,italics]{}#[none]", RATE_KIB)
         );
     }
 
@@ -181,7 +201,7 @@ mod tests {
     fn iec_fmt_styled_mib() {
         assert_eq!(
             iec_fmt_styled(3 * 1024 * 1024),
-            "3#[fg=colour237,none,italics]MiB/s#[none]"
+            format!("3#[fg=colour237,none,italics]{}#[none]", RATE_MIB)
         );
     }
 
@@ -198,9 +218,9 @@ mod tests {
         // Verify number and unit are correctly separated for all unit types.
         for (bps, expected_num, expected_unit) in [
             (500_u64,                   "500", "B/s"),
-            (2 * 1024,                    "2", "KiB/s"),
-            (5 * 1024 * 1024,             "5", "MiB/s"),
-            (2 * 1024 * 1024 * 1024,      "2", "GiB/s"),
+            (2 * 1024,                    "2", RATE_KIB),
+            (5 * 1024 * 1024,             "5", RATE_MIB),
+            (2 * 1024 * 1024 * 1024,      "2", RATE_GIB),
         ] {
             let s = iec_fmt_styled(bps);
             assert!(s.starts_with(expected_num), "num for {bps}: {s}");
@@ -220,7 +240,7 @@ mod tests {
     #[test]
     fn format_bandwidth_shows_human_readable_speed() {
         let out = format_bandwidth(2 * 1024 * 1024, 0); // 2 MiB/s
-        assert!(out.contains("MiB/s"), "expected MiB/s in: {out}");
+        assert!(out.contains(RATE_MIB), "expected MiB glyph in: {out}");
     }
 
     // ── render state machine ─────────────────────────────────────────────────

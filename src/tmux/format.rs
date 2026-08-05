@@ -20,6 +20,71 @@ pub const FG_GREY89: &str = "254";
 pub const FG_PREVIOUS: &str = "025";
 pub const FG_PURPLE: &str = "53";
 
+// Status-bar background — what a segment sits on.  Used as the segment
+// background in outline styles and as the trailing-arrow background.
+pub const BG_BAR: &str = "233";
+
+// Outline-mode accents.  The fill palette picks colors readable on a *light*
+// segment background; on the dark status bar those same colors disappear, so
+// the bright outline style swaps in lighter equivalents.
+pub const AC_GONE: &str = "203";
+pub const AC_LOADING: &str = "105";
+pub const AC_GREEN: &str = "84";
+pub const AC_DARK_BLUE: &str = "75";
+pub const AC_PURPLE: &str = "141";
+pub const AC_NEW: &str = "39";
+
+/// Fill = solid state-colored background (the original look).
+/// Outline = state color moves to the foreground, background becomes the bar,
+/// icon colors untouched.  OutlineBright = same, with icon colors lightened so
+/// they stay readable on the dark bar.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Style {
+    Fill,
+    Outline,
+    #[default]
+    OutlineBright,
+}
+
+impl Style {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "fill" => Some(Style::Fill),
+            "outline" => Some(Style::Outline),
+            "outline-bright" | "bright" => Some(Style::OutlineBright),
+            _ => None,
+        }
+    }
+}
+
+/// Every color the git segment draws with, resolved for one status + style.
+/// The rendering code only reads from here, so a new style is a new palette
+/// and no rendering changes.
+#[derive(Clone, Copy, Debug)]
+pub struct Palette {
+    pub bg: &'static str,
+    pub fg: &'static str,
+    /// Filler that restores the main text color after a colored icon.
+    pub reset_fg: &'static str,
+    /// Color of the trailing end cap.
+    pub cap: &'static str,
+    /// Glyph the segment ends with — solid arrow when filled, thin when not.
+    pub cap_glyph: &'static str,
+    pub loading_fg: &'static str,
+    pub loading_bg: &'static str,
+    pub loading_cap: &'static str,
+    pub error_fg: &'static str,
+    pub error_bg: &'static str,
+    pub error_cap: &'static str,
+    pub prev_fg: &'static str,
+    pub new_fg: &'static str,
+    pub green_fg: &'static str,
+    pub dirty_fg: &'static str,
+    pub ahead_fg: &'static str,
+    pub unmerged_fg: &'static str,
+    pub stash_fg: &'static str,
+}
+
 /// Segment is an ordered list of string parts joined together to form a tmux status string.
 /// Mirrors Go's pkg/ansi/segment.go `Segment []string`.
 #[derive(Default, Clone)]

@@ -14,7 +14,12 @@ pub async fn dispatch(req: Request, state: Arc<Mutex<ServerState>>) -> Response 
             let path = req.args["path"].as_str().map(std::path::PathBuf::from);
             let pid = req.args["pane_pid"].as_u64().map(|n| n as u32);
             let force = req.args["force"].as_bool().unwrap_or(false);
-            segments::git::render(path, pid, force).await
+            let style = req.args["style"]
+                .as_str()
+                .and_then(crate::tmux::format::Style::parse)
+                .unwrap_or_default();
+            let no_cap = req.args["no_cap"].as_bool().unwrap_or(false);
+            segments::git::render(path, pid, force, style, no_cap).await
         }
         "battery" => {
             const TTL: Duration = Duration::from_secs(30);
